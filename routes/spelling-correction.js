@@ -7,6 +7,7 @@ const axios = require("axios");
 const exerciseDatabase = require("../data/exercises");
 
 console.log("🔑 تحميل spelling-correction.js...");
+console.log("ELEVEN FROM SPELLING ROUTE:", process.env.ELEVENLABS_API_KEY);
 
 // ===================================
 // GET جملة حسب المستوى
@@ -72,7 +73,6 @@ router.post("/generate-speech", protect, async (req, res) => {
     res.status(500).json({ success: false, message: "❌ خطأ في توليد الصوت" });
   }
 });
-console.log("ELEVEN:", process.env.ELEVENLABS_API_KEY);
 
 // ===================================
 // POST التصحيح
