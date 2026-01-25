@@ -10,8 +10,8 @@ const pronunciationRoutes = require("./routes/pronunciation");
 
 const app = express();
 
-// Middleware
-const allowedOrigins = [/\.vercel\.app$/]; // يقبل أي subdomain من vercel.app
+
+const allowedOrigins = [/\.vercel\.app$/]; // أي subdomain من vercel.app
 
 app.use(
   cors({
@@ -28,9 +28,7 @@ app.use(
   })
 );
 
-// preflight
-
-app.options("*", cors());
+app.options("*", cors()); // preflight
 
 app.use(express.json());
 
