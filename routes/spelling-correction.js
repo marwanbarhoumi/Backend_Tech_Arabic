@@ -72,6 +72,7 @@ router.post("/generate-speech", protect, async (req, res) => {
     res.status(500).json({ success: false, message: "❌ خطأ في توليد الصوت" });
   }
 });
+console.log("ELEVEN:", process.env.ELEVENLABS_API_KEY);
 
 // ===================================
 // POST التصحيح
