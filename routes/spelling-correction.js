@@ -38,22 +38,20 @@ router.get("/exercise/:level", protect, (req, res) => {
 // ===================================
 router.post("/generate-speech", protect, async (req, res) => {
   try {
-    const userId = req.user?.id || req.user?.email || "guest";
+    const userId = req.user?.id || "guest";
     const now = Date.now();
 
+    // Rate limiting (مثال: 1 request / 10 sec)
     const lastCall = rateLimitMap.get(userId) || 0;
-
-    if (now - lastCall < LIMIT_TIME) {
+    if (now - lastCall < 10000) {
       return res.status(429).json({
         success: false,
         message: "⏳ استنى شوية قبل ما تعاود تولّد الصوت"
       });
     }
-
     rateLimitMap.set(userId, now);
 
     const { text } = req.body;
-
     if (!text || !text.trim()) {
       return res.status(400).json({
         success: false,
@@ -62,11 +60,10 @@ router.post("/generate-speech", protect, async (req, res) => {
     }
 
     const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+
     if (!ELEVENLABS_API_KEY) {
-      return res.status(500).json({
-        success: false,
-        message: "❌ ELEVENLABS API KEY غير موجود"
-      });
+      // لو API Key غير موجود، نرجعو fallback
+      return res.json({ success: false, audioUrl: null, fallback: true });
     }
 
     const voiceId = "21m00Tcm4TlvDq8ikWAM";
@@ -89,20 +86,11 @@ router.post("/generate-speech", protect, async (req, res) => {
 
     res.json({ success: true, audioUrl });
   } catch (err) {
-    console.error(
-      "❌ ElevenLabs error:",
-      err.response?.data
-        ? Buffer.from(err.response.data).toString()
-        : err.message
-    );
-
-    res.status(500).json({
-      success: false,
-      message: "❌ خطأ في توليد الصوت"
-    });
+    console.error("❌ ElevenLabs error:", err.response?.data || err.message);
+    // هنا بدل 500 → نرجعو JSON مع fallback
+    res.json({ success: false, audioUrl: null, fallback: true });
   }
 });
-
 
 // ===================================
 // POST تصحيح الإملاء
@@ -118,9 +106,7 @@ router.post("/correct", protect, (req, res) => {
   }
 
   const allExercises = Object.values(exerciseDatabase).flat();
-  const exercise = allExercises.find(
-    (e) => e.id === Number(exerciseId)
-  );
+  const exercise = allExercises.find((e) => e.id === Number(exerciseId));
 
   if (!exercise) {
     return res.status(404).json({
@@ -181,12 +167,12 @@ function compareWithCorrectSentence(
       score === 100
         ? "ممتاز 👏"
         : score >= 80
-        ? "جيد جداً ✨"
-        : score >= 60
-        ? "جيد 📝"
-        : score >= 40
-        ? "مقبول 🎯"
-        : "يحتاج تحسين 🚀"
+          ? "جيد جداً ✨"
+          : score >= 60
+            ? "جيد 📝"
+            : score >= 40
+              ? "مقبول 🎯"
+              : "يحتاج تحسين 🚀"
   };
 }
 
