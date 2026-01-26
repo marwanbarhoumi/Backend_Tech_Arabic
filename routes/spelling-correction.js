@@ -5,6 +5,8 @@ require("dotenv").config();
 const axios = require("axios");
 
 const exerciseDatabase = require("../data/exercises");
+const rateLimitMap = new Map();
+const LIMIT_TIME = 5000;
 
 console.log("🔑 تحميل spelling-correction.js...");
 console.log("ELEVEN FROM SPELLING ROUTE:", process.env.ELEVENLABS_API_KEY);
@@ -36,6 +38,20 @@ router.get("/exercise/:level", protect, (req, res) => {
 // ===================================
 router.post("/generate-speech", protect, async (req, res) => {
   try {
+    const userId = req.user?.id || req.user?.email || "guest";
+    const now = Date.now();
+
+    const lastCall = rateLimitMap.get(userId) || 0;
+
+    if (now - lastCall < LIMIT_TIME) {
+      return res.status(429).json({
+        success: false,
+        message: "⏳ استنى شوية قبل ما تعاود تولّد الصوت"
+      });
+    }
+
+    rateLimitMap.set(userId, now);
+
     const { text } = req.body;
 
     if (!text || !text.trim()) {
@@ -49,7 +65,7 @@ router.post("/generate-speech", protect, async (req, res) => {
     if (!ELEVENLABS_API_KEY) {
       return res.status(500).json({
         success: false,
-        message: "❌ ELEVENLABS_API_KEY غير موجود في السيرفر"
+        message: "❌ ELEVENLABS API KEY غير موجود"
       });
     }
 
@@ -58,19 +74,11 @@ router.post("/generate-speech", protect, async (req, res) => {
 
     const response = await axios.post(
       apiUrl,
-      {
-        text,
-        model_id: "eleven_multilingual_v2",
-        voice_settings: {
-          stability: 0.4,
-          similarity_boost: 0.7
-        }
-      },
+      { text },
       {
         headers: {
           "xi-api-key": ELEVENLABS_API_KEY,
-          "Content-Type": "application/json",
-          "Accept": "audio/mpeg"
+          "Content-Type": "application/json"
         },
         responseType: "arraybuffer"
       }
@@ -79,18 +87,22 @@ router.post("/generate-speech", protect, async (req, res) => {
     const audioBase64 = Buffer.from(response.data).toString("base64");
     const audioUrl = `data:audio/mpeg;base64,${audioBase64}`;
 
-    res.json({
-      success: true,
-      audioUrl
-    });
-  } catch (error) {
-    console.error("❌ ElevenLabs error:", error.response?.data || error.message);
+    res.json({ success: true, audioUrl });
+  } catch (err) {
+    console.error(
+      "❌ ElevenLabs error:",
+      err.response?.data
+        ? Buffer.from(err.response.data).toString()
+        : err.message
+    );
+
     res.status(500).json({
       success: false,
       message: "❌ خطأ في توليد الصوت"
     });
   }
 });
+
 
 // ===================================
 // POST تصحيح الإملاء
