@@ -38,15 +38,15 @@ router.get("/exercise/:level", protect, (req, res) => {
 // ===================================
 router.post("/generate-speech", protect, async (req, res) => {
   try {
-    const userId = req.user?.id || "guest";
+    const userId = req.user?.id || req.user?.email || "guest";
     const now = Date.now();
 
-    // Rate limiting (مثال: 1 request / 10 sec)
     const lastCall = rateLimitMap.get(userId) || 0;
-    if (now - lastCall < 10000) {
+    if (now - lastCall < LIMIT_TIME) {
       return res.status(429).json({
         success: false,
-        message: "⏳ استنى شوية قبل ما تعاود تولّد الصوت"
+        message: "⏳ استنى شوية قبل ما تعاود تولّد الصوت",
+        fallback: true
       });
     }
     rateLimitMap.set(userId, now);
@@ -55,42 +55,43 @@ router.post("/generate-speech", protect, async (req, res) => {
     if (!text || !text.trim()) {
       return res.status(400).json({
         success: false,
-        message: "❌ النص مطلوب"
+        message: "❌ النص مطلوب",
+        fallback: true
       });
     }
 
     const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-
-    if (!ELEVENLABS_API_KEY) {
-      // لو API Key غير موجود، نرجعو fallback
-      return res.json({ success: false, audioUrl: null, fallback: true });
-    }
-
     const voiceId = "21m00Tcm4TlvDq8ikWAM";
     const apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
 
-    const response = await axios.post(
-      apiUrl,
-      { text },
-      {
-        headers: {
-          "xi-api-key": ELEVENLABS_API_KEY,
-          "Content-Type": "application/json"
-        },
-        responseType: "arraybuffer"
-      }
-    );
+    const response = await axios.post(apiUrl, { text }, {
+      headers: {
+        "xi-api-key": ELEVENLABS_API_KEY,
+        "Content-Type": "application/json"
+      },
+      responseType: "arraybuffer"
+    });
 
     const audioBase64 = Buffer.from(response.data).toString("base64");
     const audioUrl = `data:audio/mpeg;base64,${audioBase64}`;
 
     res.json({ success: true, audioUrl });
+
   } catch (err) {
-    console.error("❌ ElevenLabs error:", err.response?.data || err.message);
-    // هنا بدل 500 → نرجعو JSON مع fallback
-    res.json({ success: false, audioUrl: null, fallback: true });
+    console.error(
+      "❌ ElevenLabs error:", 
+      err.response?.data?.toString() || err.message
+    );
+
+    // **Fallback response**
+    res.json({
+      success: false,
+      message: "❌ ElevenLabs blocked, using fallback TTS",
+      fallback: true
+    });
   }
 });
+
 
 // ===================================
 // POST تصحيح الإملاء
