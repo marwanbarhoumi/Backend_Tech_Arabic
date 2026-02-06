@@ -1,19 +1,18 @@
 const express = require("express");
 const { protect } = require("../Middlewares/auth");
 const router = express.Router();
-require("dotenv").config();
 const axios = require("axios");
+require("dotenv").config();
 
 const exerciseDatabase = require("../data/exercises");
+
+// simple rate limit per user
 const rateLimitMap = new Map();
 const LIMIT_TIME = 5000;
 
-console.log("🔑 تحميل spelling-correction.js...");
-console.log("ELEVEN FROM SPELLING ROUTE:", process.env.ELEVENLABS_API_KEY);
-
-// ===================================
-// GET تمرين حسب المستوى
-// ===================================
+// ================================
+// GET exercise by level
+// ================================
 router.get("/exercise/:level", protect, (req, res) => {
   const level = Number(req.params.level);
   const exercises = exerciseDatabase[level];
@@ -33,9 +32,9 @@ router.get("/exercise/:level", protect, (req, res) => {
   });
 });
 
-// ===================================
-// POST توليد الصوت (ElevenLabs)
-// ===================================
+// ================================
+// POST generate speech (ElevenLabs)
+// ================================
 router.post("/generate-speech", protect, async (req, res) => {
   try {
     const userId = req.user?.id || req.user?.email || "guest";
@@ -43,77 +42,63 @@ router.post("/generate-speech", protect, async (req, res) => {
 
     const lastCall = rateLimitMap.get(userId) || 0;
     if (now - lastCall < LIMIT_TIME) {
-      return res.status(429).json({
-        success: false,
-        message: "⏳ استنى شوية قبل ما تعاود تولّد الصوت",
-        fallback: true
-      });
+      return res.status(429).json({ message: "Rate limit" });
     }
     rateLimitMap.set(userId, now);
 
     const { text } = req.body;
     if (!text || !text.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "❌ النص مطلوب",
-        fallback: true
-      });
+      return res.status(400).json({ message: "Text required" });
     }
 
-    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ message: "TTS unavailable" });
+    }
+
     const voiceId = "21m00Tcm4TlvDq8ikWAM";
     const apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
 
-    const response = await axios.post(apiUrl, { text }, {
-      headers: {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json"
-      },
-      responseType: "arraybuffer"
-    });
-
-    const audioBase64 = Buffer.from(response.data).toString("base64");
-    const audioUrl = `data:audio/mpeg;base64,${audioBase64}`;
-
-    res.json({ success: true, audioUrl });
-
-  } catch (err) {
-    console.error(
-      "❌ ElevenLabs error:", 
-      err.response?.data?.toString() || err.message
+    const response = await axios.post(
+      apiUrl,
+      { text },
+      {
+        headers: {
+          "xi-api-key": apiKey,
+          "Content-Type": "application/json"
+        },
+        responseType: "arraybuffer"
+      }
     );
 
-    // **Fallback response**
-    res.json({
-      success: false,
-      message: "❌ ElevenLabs blocked, using fallback TTS",
-      fallback: true
+    res.set({
+      "Content-Type": "audio/mpeg",
+      "Content-Length": response.data.length
     });
+
+    res.send(response.data);
+
+  } catch (err) {
+    console.error("❌ ElevenLabs error:", err.response?.status || err.message);
+    res.status(503).json({ message: "TTS service unavailable" });
   }
 });
 
-
-// ===================================
-// POST تصحيح الإملاء
-// ===================================
+// ================================
+// POST spelling correction
+// ================================
 router.post("/correct", protect, (req, res) => {
   const { text, exerciseId } = req.body;
 
   if (!text) {
-    return res.status(400).json({
-      success: false,
-      message: "❌ النص مطلوب"
-    });
+    return res.status(400).json({ success: false, message: "❌ النص مطلوب" });
   }
 
   const allExercises = Object.values(exerciseDatabase).flat();
-  const exercise = allExercises.find((e) => e.id === Number(exerciseId));
+  const exercise = allExercises.find(e => e.id === Number(exerciseId));
 
   if (!exercise) {
-    return res.status(404).json({
-      success: false,
-      message: "❌ التمرين غير موجود"
-    });
+    return res.status(404).json({ success: false, message: "❌ التمرين غير موجود" });
   }
 
   const result = compareWithCorrectSentence(
@@ -131,14 +116,7 @@ router.post("/correct", protect, (req, res) => {
   });
 });
 
-// ===================================
-// دالة المقارنة
-// ===================================
-function compareWithCorrectSentence(
-  studentSentence,
-  correctSentence,
-  correctWords
-) {
+function compareWithCorrectSentence(studentSentence, correctSentence, correctWords) {
   const clean = studentSentence.trim().replace(/\s+/g, " ");
   const studentWords = clean.split(" ");
 
@@ -146,11 +124,9 @@ function compareWithCorrectSentence(
   const mistakes = [];
 
   correctWords.forEach((word, i) => {
-    if (studentWords[i] === word) {
-      correctCount++;
-    } else {
+    if (studentWords[i] === word) correctCount++;
+    else {
       mistakes.push({
-        position: i + 1,
         original: studentWords[i] || "[ناقصة]",
         corrected: word,
         type: studentWords[i] ? "إملائي" : "نقص"
@@ -165,17 +141,12 @@ function compareWithCorrectSentence(
     mistakes,
     isPerfect: score === 100,
     feedback:
-      score === 100
-        ? "ممتاز 👏"
-        : score >= 80
-          ? "جيد جداً ✨"
-          : score >= 60
-            ? "جيد 📝"
-            : score >= 40
-              ? "مقبول 🎯"
-              : "يحتاج تحسين 🚀"
+      score === 100 ? "ممتاز 👏" :
+      score >= 80 ? "جيد جداً ✨" :
+      score >= 60 ? "جيد 📝" :
+      score >= 40 ? "مقبول 🎯" :
+      "يحتاج تحسين 🚀"
   };
 }
 
-console.log("✅ spelling-correction.js جاهز");
 module.exports = router;
