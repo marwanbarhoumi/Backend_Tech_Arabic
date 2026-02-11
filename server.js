@@ -19,7 +19,7 @@ app.use(
       if (!origin || allowedOrigins.some((r) => r.test(origin))) {
         callback(null, true);
       } else {
-        callback(new Error("Not allowed by CORS"));
+        callback(new Error("Noot allowed by CORS"));
       }
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
