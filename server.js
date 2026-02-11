@@ -10,7 +10,6 @@ const pronunciationRoutes = require("./routes/pronunciation");
 
 const app = express();
 
-
 const allowedOrigins = [/\.vercel\.app$/]; // أي subdomain من vercel.app
 
 app.use(
@@ -38,16 +37,6 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/spelling", spellingRoutes);
 app.use("/api/pronunciation", pronunciationRoutes);
 
-// Route de test
-app.get("/api/test", (req, res) => {
-  res.json({ message: "🚀 Backend Arabic AI School is running!" });
-});
-
-app.use("/api/spelling", (req, res, next) => {
-  console.log("🔥 SPELLING ROUTE HIT:", req.method, req.url);
-  next();
-}, spellingRoutes);
-
 // Connexion à MongoDB
 mongoose
   .connect(
@@ -61,5 +50,4 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log("ELEVEN FROM SPELLING ROUTE:", process.env.ELEVENLABS_API_KEY);
-
 });
