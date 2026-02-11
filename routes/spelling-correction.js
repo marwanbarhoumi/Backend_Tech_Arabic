@@ -76,5 +76,83 @@ router.post(
     });
   }
 );
+// ===================================
+// POST التصحيح
+// ===================================
+router.post("/correct", protect, (req, res) => {
+  const { text, exerciseId } = req.body;
+
+  if (!text) {
+    return res.status(400).json({ success: false, message: "❌ النص مطلوب" });
+  }
+
+  const allExercises = Object.values(exerciseDatabase).flat();
+  const exercise = allExercises.find((e) => e.id === Number(exerciseId));
+
+  if (!exercise) {
+    return res
+      .status(404)
+      .json({ success: false, message: "❌ التمرين غير موجود" });
+  }
+
+  const result = compareWithCorrectSentence(
+    text,
+    exercise.correctSentence,
+    exercise.words
+  );
+
+  res.json({
+    success: true,
+    ...result,
+    originalText: text,
+    correctedText: exercise.correctSentence,
+    targetSentence: exercise.correctSentence
+  });
+});
+
+// ===================================
+// دالة المقارنة
+// ===================================
+function compareWithCorrectSentence(
+  studentSentence,
+  correctSentence,
+  correctWords
+) {
+  const clean = studentSentence.trim().replace(/\s+/g, " ");
+  const studentWords = clean.split(" ");
+
+  let correctCount = 0;
+  const mistakes = [];
+
+  correctWords.forEach((word, i) => {
+    if (studentWords[i] === word) correctCount++;
+    else {
+      mistakes.push({
+        position: i + 1,
+        original: studentWords[i] || "[ناقصة]",
+        corrected: word,
+        type: studentWords[i] ? "إملائي" : "نقص"
+      });
+    }
+  });
+
+  const score = Math.round((correctCount / correctWords.length) * 100);
+
+  return {
+    score,
+    mistakes,
+    isPerfect: score === 100,
+    feedback:
+      score === 100
+        ? "ممتاز 👏"
+        : score >= 80
+        ? "جيد جداً ✨"
+        : score >= 60
+        ? "جيد 📝"
+        : score >= 40
+        ? "مقبول 🎯"
+        : "يحتاج تحسين 🚀"
+  };
+}
 
 module.exports = router;
