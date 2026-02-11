@@ -144,7 +144,7 @@ function compareWithCorrectSentence(
     isPerfect: score === 100,
     feedback:
       score === 100
-        ? "ممتاز 👏"
+        ? "ممتاز  👏"
         : score >= 80
         ? "جيد جداً ✨"
         : score >= 60
