@@ -79,7 +79,7 @@ router.post(
 // ===================================
 // POST التصحيح
 // ===================================
-router.post("/correct",  (req, res) => {
+router.post("/correction",  (req, res) => {
   const { text, exerciseId } = req.body;
 
   if (!text) {
