@@ -43,6 +43,11 @@ app.get("/api/test", (req, res) => {
   res.json({ message: "🚀 Backend Arabic AI School is running!" });
 });
 
+app.use("/api/spelling", (req, res, next) => {
+  console.log("🔥 SPELLING ROUTE HIT:", req.method, req.url);
+  next();
+}, spellingRoutes);
+
 // Connexion à MongoDB
 mongoose
   .connect(
