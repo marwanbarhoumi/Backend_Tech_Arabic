@@ -1,25 +1,12 @@
-function normalizeArabic(text) {
-  if (!text) return "";
-
+module.exports = function normalizeArabic(text) {
   return text
-    // نحّي التشكيل
-    .replace(/[\u064B-\u065F]/g, "")
-
-    // توحيد الألف
-    .replace(/[أإآ]/g, "ا")
-
-    // توحيد الياء
+    .replace(/[ًٌٍَُِّْـ]/g, "")      // remove tashkeel
+    .replace(/أ|إ|آ/g, "ا")
     .replace(/ى/g, "ي")
-
-    // توحيد التاء المربوطة (اختياري)
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
     .replace(/ة/g, "ه")
-
-    // نحّي الرموز
-    .replace(/[^\u0600-\u06FF\s]/g, "")
-
-    // spaces
     .replace(/\s+/g, " ")
-    .trim();
-}
-
-module.exports = normalizeArabic;
+    .trim()
+    .toLowerCase();
+};

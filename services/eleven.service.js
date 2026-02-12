@@ -1,18 +1,16 @@
-const { getCached, setCache } = require("./ttsCache");
 const axios = require("axios");
+const FormData = require("form-data");
 
-async function textToSpeech(text) {
-  const cached = getCached(text);
-  if (cached) {
-    console.log("⚡ TTS from cache");
-    return cached;
-  }
+const ELEVEN_API_KEY = process.env.ELEVENLABS_API_KEY;
+const VOICE_ID = process.env.VOICE_ID;
 
+// 🔊 TEXT TO SPEECH
+exports.textToSpeech = async (text) => {
   const response = await axios({
     method: "POST",
-    url: "https://api.elevenlabs.io/v1/text-to-speech/YOUR_VOICE_ID",
+    url: `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
     headers: {
-      "xi-api-key": process.env.ELEVENLABS_API_KEY,
+      "xi-api-key": ELEVEN_API_KEY,
       "Content-Type": "application/json"
     },
     responseType: "arraybuffer",
@@ -22,8 +20,27 @@ async function textToSpeech(text) {
     }
   });
 
-  setCache(text, response.data);
-  console.log("💰 TTS from ElevenLabs");
+  return Buffer.from(response.data);
+};
 
-  return response.data;
-}
+// 🎤 SPEECH TO TEXT
+exports.speechToText = async (audioBuffer) => {
+  const formData = new FormData();
+  formData.append("file", audioBuffer, {
+    filename: "audio.webm",
+  });
+  formData.append("model_id", "scribe_v1");
+
+  const response = await axios.post(
+    "https://api.elevenlabs.io/v1/speech-to-text",
+    formData,
+    {
+      headers: {
+        "xi-api-key": ELEVEN_API_KEY,
+        ...formData.getHeaders()
+      }
+    }
+  );
+
+  return response.data.text;
+};
