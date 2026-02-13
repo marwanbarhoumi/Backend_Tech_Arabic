@@ -1,71 +1,90 @@
+const express = require("express");
+const multer = require("multer");
+const exerciseDatabase = require("../data/exercises");
+const compare = require("../utils/compare");
 const { textToSpeech, speechToText } = require("../services/eleven.service");
-const normalizeArabic = require("../utils/arabicNormalizer");
-const scorePronunciation = require("../utils/pronunciationScorer");
+const { protect } = require("../Middlewares/auth");
 
-const sentences = [
-  "اللغة العربية جميلة",
-  "أنا أحب تعلم البرمجة",
-  "الطقس اليوم مشمس",
-  "العلم نور والجهل ظلام",
-  "القراءة غذاء العقل"
-];
+const router = express.Router();
+const upload = multer();
 
-// 🎯 Generate Exercise
-exports.generateExercise = async (req, res) => {
-  try {
-    const random = sentences[Math.floor(Math.random() * sentences.length)];
-    res.json({ sentence: random });
-  } catch (err) {
-    res.status(500).json({ message: "Exercise error" });
+/* =========================
+   GET EXERCISE BY LEVEL
+========================= */
+router.get("/exercise/:level", protect, (req, res) => {
+  const level = Number(req.params.level);
+  const exercises = exerciseDatabase[level];
+
+  if (!exercises) {
+    return res.status(404).json({
+      success: false,
+      message: "❌ المستوى غير موجود"
+    });
   }
-};
 
-// 🔊 Generate Speech
-exports.generateSpeech = async (req, res) => {
+  const random = exercises[Math.floor(Math.random() * exercises.length)];
+
+  res.json({
+    success: true,
+    exercise: random
+  });
+});
+
+/* =========================
+   TEXT TO SPEECH
+========================= */
+router.post("/generate-speech", protect, async (req, res) => {
   try {
     const { text } = req.body;
 
-    const audioBuffer = await textToSpeech(text);
-
-    res.set({
-      "Content-Type": "audio/mpeg",
-      "Content-Length": audioBuffer.length,
-    });
-
-    res.send(audioBuffer);
-  } catch (err) {
-    console.error(err.response?.data || err.message);
-    res.status(500).json({ message: "TTS error" });
-  }
-};
-
-// 🎤 Check Pronunciation
-exports.checkPronunciation = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No audio file uploaded" });
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: "text required" });
     }
 
-    const { originalText } = req.body;
+    const audioBuffer = await textToSpeech(text);
 
-    // 🔥 Speech to Text
-    const transcription = await speechToText(req.file.buffer);
+    res.set({ "Content-Type": "audio/mpeg" });
+    return res.send(audioBuffer);
+  } catch (err) {
+    console.error("TTS error:", err.response?.data?.toString() || err.message);
+    return res.status(500).json({ success: false, message: "TTS failed" });
+  }
+});
 
-    // 🔥 Normalize Arabic
-    const cleanOriginal = normalizeArabic(originalText);
-    const cleanUser = normalizeArabic(transcription);
+/* =========================
+   CHECK PRONUNCIATION
+========================= */
+router.post("/check", protect, upload.single("audio"), async (req, res) => {
+  try {
+    const exerciseId = Number(req.body.exerciseId);
 
-    // 🔥 Score
-    const result = scorePronunciation(cleanOriginal, cleanUser);
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "audio required" });
+    }
 
-    res.json({
-      originalText,
-      transcription,
+    const allExercises = Object.values(exerciseDatabase).flat();
+    const exercise = allExercises.find((e) => e.id === exerciseId);
+
+    if (!exercise) {
+      return res.status(404).json({
+        success: false,
+        message: "❌ التمرين غير موجود"
+      });
+    }
+
+    const studentText = await speechToText(req.file.buffer);
+    const result = compare(studentText, exercise.correctSentence);
+
+    return res.json({
+      success: true,
+      recognizedText: studentText,
+      targetSentence: exercise.correctSentence,
       ...result
     });
-
   } catch (err) {
-    console.error(err.response?.data || err.message);
-    res.status(500).json({ message: "Pronunciation check error" });
+    console.error("Pronunciation check error:", err.response?.data?.toString() || err.message);
+    return res.status(500).json({ success: false, message: "check failed" });
   }
-};
+});
+
+module.exports = router;
