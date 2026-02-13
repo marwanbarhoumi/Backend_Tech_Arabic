@@ -1,4 +1,4 @@
-/*const express = require("express");
+const express = require("express");
 const multer = require("multer");
 const exerciseDatabase = require("../data/exercises");
 const compare = require("../utils/compare");
@@ -10,7 +10,7 @@ const upload = multer();
 
 /* =========================
    GET EXERCISE BY LEVEL
-========================= 
+========================= */
 router.get("/exercise/:level", protect, (req, res) => {
   const level = Number(req.params.level);
   const exercises = exerciseDatabase[level];
@@ -33,7 +33,7 @@ router.get("/exercise/:level", protect, (req, res) => {
 
 /* =========================
    TEXT TO SPEECH
-========================= 
+========================= */
 router.post("/generate-speech", protect, async (req, res) => {
   try {
     const { text } = req.body;
@@ -56,7 +56,7 @@ router.post("/generate-speech", protect, async (req, res) => {
 
 /* =========================
    CHECK PRONUNCIATION
-========================= 
+========================= */
 router.post(
   "/check",
   protect,
@@ -98,22 +98,4 @@ router.post(
   }
 );
 
-module.exports = router; */
-
-
-const express = require("express");
-const router = express.Router();
-const multer = require("multer");
-const upload = multer();
-
-const {
-  generateExercise,
-  generateSpeech,
-  checkPronunciation,
-} = require("../controllers/pronunciation.controller");
-
-router.get("/exercise", generateExercise);
-router.post("/generate-speech", generateSpeech);
-router.post("/check", upload.single("audio"), checkPronunciation);
-
-module.exports = router;
+module.exports = router; 
