@@ -15,20 +15,11 @@ router.get("/exercise/:level", protect, (req, res) => {
   const level = Number(req.params.level);
   const exercises = exerciseDatabase[level];
 
-  if (!exercises) {
-    return res.status(404).json({
-      success: false,
-      message: "❌ المستوى غير موجود"
-    });
-  }
+  if (!exercises)
+    return res.status(404).json({ success: false });
 
-  const random =
-    exercises[Math.floor(Math.random() * exercises.length)];
-
-  res.json({
-    success: true,
-    exercise: random
-  });
+  const random = exercises[Math.floor(Math.random() * exercises.length)];
+  res.json({ success: true, exercise: random });
 });
 
 /* =========================
