@@ -10,23 +10,26 @@ const pronunciationRoutes = require("./routes/pronunciation");
 
 const app = express();
 
-const allowedOrigins = [/\.vercel\.app$/]; // أي subdomain من vercel.app
+const allowedOrigins = [/^https:\/\/.*\.vercel\.app$/];
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.some((r) => r.test(origin))) {
-        callback(null, true);
-      } else {
-        callback(new Error("Noot allowed by CORS"));
-        
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
-  })
-);
+    const isAllowed = allowedOrigins.some((r) => r.test(origin));
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS: " + origin));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // ✅ نفس config موش cors()
 
 app.options("*", cors()); // preflight
 
