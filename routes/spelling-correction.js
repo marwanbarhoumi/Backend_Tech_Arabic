@@ -27,22 +27,46 @@ router.get("/exercise/:level", protect, (req, res) => {
    GENERATE SPEECH (ElevenLabs)
 ================================ */
 router.post("/generate-speech", protect, async (req, res) => {
-  const { text } = req.body;
+  try {
+    const { text } = req.body;
 
-  const response = await axios.post(
-    `https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM`,
-    { text },
-    {
-      headers: {
-        "xi-api-key": process.env.ELEVENLABS_API_KEY,
-        "Content-Type": "application/json"
-      },
-      responseType: "arraybuffer"
+    if (!text) {
+      return res.status(400).json({ success: false, message: "No text" });
     }
-  );
 
-  res.send(response.data);
+    if (!process.env.ELEVENLABS_API_KEY) {
+      console.error("❌ ELEVENLABS_API_KEY missing");
+      return res.status(500).json({ success: false, message: "API key missing" });
+    }
+
+    const response = await axios.post(
+      "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM",
+      {
+        text,
+        model_id: "eleven_multilingual_v2"
+      },
+      {
+        headers: {
+          "xi-api-key": process.env.ELEVENLABS_API_KEY,
+          "Content-Type": "application/json"
+        },
+        responseType: "arraybuffer"
+      }
+    );
+
+    res.set({
+      "Content-Type": "audio/mpeg",
+      "Access-Control-Allow-Origin": "*"
+    });
+
+    res.send(response.data);
+
+  } catch (error) {
+    console.error("🔥 ElevenLabs ERROR:", error.response?.data || error.message);
+    res.status(500).json({ success: false, error: "TTS failed" });
+  }
 });
+
 
 /* ===============================
    CHECK PRONUNCIATION (MOCK)
