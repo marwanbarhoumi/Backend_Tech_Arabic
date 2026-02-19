@@ -18,6 +18,11 @@ exports.textToSpeech = async (text) => {
       text,
       model_id: "eleven_multilingual_v2"
     }
+    ,
+      params: {
+        model_id: "scribe_v1",
+        language: "ar"   // 🔥 مهم جداً
+      }
   });
 
   return Buffer.from(response.data);
